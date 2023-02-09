@@ -19,7 +19,7 @@ library(lme4) # mixed effect modelling
 library(MESS) # for drop1 function on GEE
 
 # Choose data file location
-data_file <- "source-data.xlsx"
+data_file <- "Input/source-data.xlsx"
 
 ########################################################################
 # Load main dataframe: run this before running any other section below #
@@ -433,7 +433,7 @@ for (i in pathogens) {
 }
 
 results <- tibble(pathogen=pathogens) %>%
-  full_join(results) %>%
+  full_join(results, multiple="all") %>%
   mutate(
     odds_ratio = exp(Estimate),
     odds_ratio_CI_low = exp(Estimate - `Std. Error`*1.96) ,
@@ -441,7 +441,7 @@ results <- tibble(pathogen=pathogens) %>%
   )
 
 print(results)
-write_csv2(results, "results_single_pathogen_modelA.csv")
+write_csv2(results, "Output/single_pathogen_models_outcome_A.csv")
 
 
 ##########################################
@@ -487,13 +487,13 @@ for (i in pathogens) {
 }
 
 results <- tibble(pathogen=pathogens) %>%
-  full_join(results) %>%
+  full_join(results, multiple="all") %>%
   mutate(
     CI_low = Estimate - `Std. Error`*1.96 ,
     CI_high = Estimate + `Std. Error`*1.96
   )
 
 print(results, n=50)
-write_csv2(results, "results_single_pathogen_modelB.csv")
+write_csv2(results, "Output/single_pathogen_models_outcome_B.csv")
 
 
