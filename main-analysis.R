@@ -1,4 +1,4 @@
-# Article title: Indoor air surveillance and factors associated with respiratory pathogen detection in community settings in Belgium
+# Article title: Natural ventilation, low CO2 and air filtration are associated with reduced indoor air respiratory pathogens
 # Authors: Joren Raymenants, Caspar Geenen, Lore Budts, Jonathan Thibaut, Marijn Thijssen, Hannelore De Mulder, Sarah Gorissen, Bastiaan Craessaerts, Lies Laenen, Kurt Beuselinck, Sien Ombelet, Els Keyaerts, Emmanuel André
 
 # This script consists of the following sections:
@@ -17,48 +17,46 @@ library(lubridate) # date handling
 library(geepack) # generalised estimating equations
 library(lme4) # mixed effect modelling
 library(MESS) # for drop1 function on GEE
-theme_set(theme_bw())
 
-# Choose data file
+# Choose data file location
 data_file <- "source-data.xlsx"
 
 ########################################################################
 # Load main dataframe: run this before running any other section below #
 ########################################################################
 
-# Read data file, remove pathogens where less than 10 samples were positive
-data_csv <- read_csv2("backward_elimination/organised_data.csv") %>%
-  group_by(pathogen) %>%
-  filter(sum(detected)>=10) %>% # remove pathogens with less than 10 positive results
-  ungroup()
-
-data <- read_excel(data_file, sheet=1, na = "NA") %>%
-  group_by(pathogen) %>%
-  filter(sum(detected)>=10) %>% # remove pathogens with less than 10 positive results
-  ungroup()
-
-# set purifier to false if data missing
-# and drop observations with missing co2 or humidity values
-# also drop observations with missing inferred values for temperature, ventilation, mask use or vocalisation
-# "babbelen" refers to vocalisation
-data$purifier <- replace_na(data$purifier,F)  # no value means no purifier
-sapply(data, function(x) sum(is.na(x))) # which data is missing?
-data <- data %>% drop_na(co2_avg,humidity_avg,temperature_inferred, ventilation_inferred, mask_inferred, babbelen_inferred)
-
-# Calculate attendee density and rescale variables.
-extra_vars <- data %>%
-  rowwise() %>%
-  mutate(
-    attendee_density = n_attendees_mean/volume,
-  ) %>%
+load_source_data <- function(file) {
   
-  # Rescale:
-  mutate(
-    month=as.factor(month),
-    year_week=as.factor(year_week),
-    co2_avg=co2_avg/100,
-    cases_per_100=cases_per_100/1000 )
-
+  # Read data file, remove pathogens where less than 10 samples were positive
+  data <- read_excel(data_file, sheet=1, na = "NA") %>%
+    group_by(pathogen) %>%
+    filter(sum(detected)>=10) %>% # remove pathogens with less than 10 positive results
+    ungroup()
+  
+  # set purifier to false if data missing
+  # and drop observations with missing co2 or humidity values
+  # also drop observations with missing inferred values for temperature, ventilation, mask use or vocalisation
+  # "babbelen" refers to vocalisation
+  data$purifier <- replace_na(data$purifier,F)  # no value means no purifier
+  sapply(data, function(x) sum(is.na(x))) # which data is missing?
+  data <- data %>% drop_na(co2_avg,humidity_avg,temperature_inferred, ventilation_inferred, mask_inferred, babbelen_inferred)
+  
+  # Calculate attendee density and rescale variables.
+  extra_vars <- data %>%
+    rowwise() %>%
+    mutate(
+      attendee_density = n_attendees_mean/volume,
+    ) %>%
+    
+    # Rescale:
+    mutate(
+      month=as.factor(month),
+      year_week=as.factor(year_week),
+      co2_avg=co2_avg/100,
+      cases_per_100=cases_per_100/1000 )
+  
+  return(extra_vars)
+}
 
 #################################################
 ### Model outcome A: probability of detection ###
@@ -83,7 +81,7 @@ gee_results <- function(m) {
 }
 
 # define data
-df_for_gee <- extra_vars %>% arrange(sample_id)
+df_for_gee <- load_source_data(data_file) %>% arrange(sample_id)
 
 # Full binomial model with all variables
 gee_model <- geeglm(
@@ -95,8 +93,8 @@ gee_model <- geeglm(
   + cases_per_100
   , data=df_for_gee, id=sample_id, family="binomial", corstr="exchangeable")
 gee_model %>% summary
-print(gee_results(gee_model))
-drop1(gee_model, test="Wald")
+print(gee_results(gee_model))  # Odds ratio 95% confidence interval and p-value for variables which are not factors.
+drop1(gee_model, test="Wald")  # Determine which variable has the highest p-value (including factors)
 # --> with all variables included, the following have a significant effect:
 #       pathogen, age group, month, co2 (increase), ventilation inferred (decrease), babbelen inferred (decrease)
 
@@ -139,7 +137,7 @@ gee_model <- geeglm(
   + co2_avg + ventilation_mean
   , data=df_for_gee_not_inferred, id=c(sample_id), family="binomial", corstr="exchangeable")
 gee_model %>% summary
-(res <- gee_results(gee_model))
+(res <- gee_results(gee_model))  # Odds ratio 95% confidence interval and p-value
 drop1(gee_model, test="Wald")
 paste0("Odds ratio of increase of 100 in CO2: ", exp(res$Estimate[res$variable=="co2_avg"]))
 paste0("Odds raio of step increase in ventilation: ", exp(res$Estimate[res$variable=="ventilation_mean"]))
@@ -163,7 +161,7 @@ glmer_results <- function(m) {
     return()
 }
 
-df_for_glmer <- extra_vars
+df_for_glmer <- load_source_data(data_file)
 
 # Full binomial model with all variables
 glmer_model <- glmer(
@@ -243,7 +241,7 @@ glm_results <- function(m) {
     return()
 }
 
-df_for_logit <- extra_vars
+df_for_logit <- load_source_data(data_file)
 
 # Binomial model with all selected initial variables and all pathogens
 model <- glm(
@@ -312,7 +310,7 @@ glm_ct_results <- function(m) {
     return()
 }
 
-df_for_ct <- extra_vars %>%
+df_for_ct <- load_source_data(data_file) %>%
   filter(detected, !is.na(ct_value)) # only include positive samples with ct value
   
 # Linear model with all selected initial variables and all pathogens
@@ -357,7 +355,7 @@ glmer_ct_results <- function(m) {
     return()
 }
 
-df_for_ct <- extra_vars %>%
+df_for_ct <- load_source_data(data_file) %>%
   filter(detected, !is.na(ct_value)) # only include positive samples with ct value
 
 # Linear model with all selected initial variables and all pathogens
@@ -396,7 +394,7 @@ paste0("More PCR cycles in case of air filtration: ", summary(model)$coefficient
 #############################################
 # Run binomial model using only the retained variables from the models above
 
-df_for_single_path <- extra_vars
+df_for_single_path <- load_source_data(data_file)
 
 backw_elim = T # Run further backward elimination on single pathogen models
 
@@ -452,7 +450,7 @@ write_csv2(results, "results_single_pathogen_modelA.csv")
 ##########################################
 # Run linear model using only the retained variables from the multi-pathogen models above
 
-df_for_single_path <- extra_vars
+df_for_single_path <- load_source_data(data_file)
 
 backw_elim = T  # Run further backward elimination on single pathogen models
 
@@ -497,4 +495,5 @@ results <- tibble(pathogen=pathogens) %>%
 
 print(results, n=50)
 write_csv2(results, "results_single_pathogen_modelB.csv")
+
 
