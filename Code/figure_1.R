@@ -1,25 +1,27 @@
 
 library(tidyverse)
 library(lubridate)
+library(readxl)
+source("Code/data_cleaning.R")
 theme_set(theme_bw())
 
-data_file <- "Input/source-data.xlsx"
+data_file <- "Input/source_data_v2.xlsx"
 
 # Read source data
-data <- read_csv2("Input/organised_data_with_date_ungrouped_recoded.csv") %>%
+data <- read_excel(data_file, sheet=1, na = "NA") %>%
+  recode_pathogens() %>%
   filter(age_group=="Child care group") %>%
   group_by(pathogen) %>%
   filter(sum(detected)>0) %>% # remove pathogens with no positive results
   ungroup() %>%
   rename(date=date_start) %>%
-  mutate(
-    pathogen = if_else(pathogen=="TaqPath COVID-19", "SARS-CoV-2", pathogen)
-  )
+  filter(pathogen!="SARS-CoV-2 (respiratory panel)")
+  
 
 # number of aerosol samples included
 length(unique(data$sample_id))
 
-respi_data <- read_csv2("data/hospital-respi-data.csv") %>%
+respi_data <- read_csv2("Input/hospital-respi-data.csv") %>%
   filter(
     `aanvragende-bron` == "LIS/Laboratoria UZ Leuven",
     age <= 3,
@@ -32,32 +34,8 @@ respi_data <- read_csv2("data/hospital-respi-data.csv") %>%
     detected = (resultaat=="positief"),
     pathogen = substr(labotest,6,200),
     pathogen = if_else(pathogen=="Coronavirus SARS/Wuhan", "SARS-CoV-2", pathogen),
-    pathogen = recode(pathogen,
-                      `TaqPath COVID-19`="SARS-CoV-2",
-                      `Adenovirus`="human adenovirus",
-                      `Bocavirus`="human bocavirus",
-                      `Chlamydophila pneumoniae`="Chlamydia pneumoniae",
-                      `Coronavirus 229E`="Human coronavirus 229E",
-                      "Coronavirus HKU-1"="Human coronavirus HKU-1",
-                      `Coronavirus NL63`="Human coronavirus NL63",
-                      `Coronavirus OC43`="Human coronavirus OC43",
-                      `Coxiella burnetti`="Coxiella burnetii",
-                      `Cytomegalovirus`="human cytomegalovirus",
-                      "Entero-/Rhinovirus"="human enterovirus (incl. rhinovirus)",
-                      `Enterovirus D68`="enterovirus D68",
-                      `Herpes simplex virus 1`="herpes simplex virus type 1",
-                      `Humaan metapneumovirus`="Human metapneumovirus",
-                      `Influenza A virus`="influenza A virus",
-                      `Mycoplasma pneumoniae`="Mycoplasma pneumoniae",
-                      `Parainfluenzavirus 3`="human parainfluenza virus 3",
-                      `Parainfluenzavirus 4`="human parainfluenza virus 4",
-                      `Pneumocystis jiroveci`="Pneumocystis jirovecii",
-                      `Respiratoir syncytieel virus`="respiratory syncytial virus",
-                      `Streptococcus pneumoniae`="Streptococcus pneumoniae",
-                      "Parainfluenzavirus"="Parainfluenzaviruses",
-                      "Other coronavirus"="Other coronaviruses"
-    )
   ) %>%
+  recode_pathogens() %>%
   inner_join(tibble(pathogen=unique(data$pathogen)), by="pathogen") # exclude pathogens that are not in the aerosol data (because they were excluded)
 
 respi_data %>% group_by(staalsoort) %>% summarise(n=n())
@@ -108,7 +86,8 @@ ggplot(plot_data, aes(x=date, y=as.numeric(detected), colour=`Sample type`)) +
     axis.ticks.y.left = element_line(colour = "red"),
     axis.text.y.left = element_text(colour = "red"),
     legend.justification = c(1,0),
-    legend.position = c(1,0)
+    legend.position = c(1,0),
+    strip.text = ggtext::element_markdown()
   )
 
 ggsave("Output/figure_1.pdf", width=13.2, height=10)

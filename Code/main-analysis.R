@@ -17,9 +17,10 @@ library(lubridate) # date handling
 library(geepack) # generalised estimating equations
 library(lme4) # mixed effect modelling
 library(MESS) # for drop1 function on GEE
+source("Code/data_cleaning.R") # import functions for data cleaning
 
 # Choose data file location
-data_file <- "Input/source-data.xlsx"
+data_file <- "Input/source_data_v2.xlsx"
 
 ########################################################################
 # Load main dataframe: run this before running any other section below #
@@ -27,8 +28,10 @@ data_file <- "Input/source-data.xlsx"
 
 load_source_data <- function(file) {
   
-  # Read data file, remove pathogens where less than 10 samples were positive
+  # Read data file, group pathogens, rename pathogens and remove pathogens where less than 10 samples were positive
   data <- read_excel(data_file, sheet=1, na = "NA") %>%
+    recode_pathogens() %>%
+    group_corona_parainf() %>%
     group_by(pathogen) %>%
     filter(sum(detected)>=10) %>% # remove pathogens with less than 10 positive results
     ungroup()

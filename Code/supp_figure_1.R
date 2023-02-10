@@ -4,9 +4,16 @@
 # by timing and age group of air sample collection.
 
 library(tidyverse)
+library(lubridate)
+library(readxl)
+library(ggtext)
+source("Code/data_cleaning.R")
 theme_set(theme_bw())
 
-data <- read_csv2("Input/organised_data_with_date_ungrouped_recoded.csv") %>%
+data_file <- "Input/source_data_v2.xlsx"
+
+data <- read_excel(data_file, sheet=1, na = "NA") %>%
+  recode_pathogens() %>%
   group_by(pathogen) %>%
   filter(sum(detected)>=1) %>% # remove pathogens with less than 1 positive results
   ungroup() %>%
@@ -24,17 +31,12 @@ data <- read_csv2("Input/organised_data_with_date_ungrouped_recoded.csv") %>%
                                 `Kindergarten`="Preschool",
                                 `Child care group`="Nursery"
     ),
-    # Rename pathogens
-    # pathogen = recode(pathogen,
-    #                   `TaqPath COVID-19`="SARS-CoV-2",
-    #                   `Adenovirus`="",
-    #                   ``
-    # ),
     # Rename date
-    Date=date_start,
+    Date=as.Date(date_start),
     # Rename results
     Result=if_else(detected,"Positive","Negative"),
-  )
+  ) %>%
+  filter(pathogen!="SARS-CoV-2 (respiratory panel)")
 
 
 ggplot(data, aes(Date,`Age group`,colour=Result)) +
@@ -43,6 +45,8 @@ ggplot(data, aes(Date,`Age group`,colour=Result)) +
   facet_wrap(~pathogen, ncol=4) +
   geom_jitter(width=0.4, height=0.3, size=0.6) +
   theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) +
-  theme(strip.background = element_rect(fill="white"))
+  theme(strip.background = element_rect(fill="white")) +
+  theme(strip.text = ggtext::element_markdown())
 
 ggsave("Output/supp_figure_1.png", width=11.2, height=10)
+ggsave("Output/supp_figure_1.pdf", width=11.2, height=10)
