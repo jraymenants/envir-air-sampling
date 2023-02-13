@@ -81,3 +81,4 @@ coefs3 <- data.frame(coef(summary(model3a)))
 coefs3$p.model2a <- 2 * (1-pt(abs(coefs3$t.value), df.model3))
 coefs3
 confint(model3a)
+
