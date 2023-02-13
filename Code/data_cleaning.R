@@ -51,10 +51,10 @@ group_corona_parainf <- function(data) {
           "Other coronavirus",
           pathogen),
         
-        # group parainfluenzaviruses
+        # group parainfluenza viruses
         pathogen=if_else(
-          grepl( "arainfluenzavirus", pathogen, fixed = TRUE), # first letter removed: not case sensitive
-          "human parainfluenzavirus",
+          grepl( "arainfluenza", pathogen, fixed = TRUE), # first letter removed: not case sensitive
+          "human parainfluenza",
           pathogen)
         
       ) %>%

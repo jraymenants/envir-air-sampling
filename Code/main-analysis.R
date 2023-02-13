@@ -31,7 +31,7 @@ load_source_data <- function(file) {
   # Read data file, group pathogens, rename pathogens and remove pathogens where less than 10 samples were positive
   data <- read_excel(data_file, sheet=1, na = "NA") %>%
     recode_pathogens() %>%
-    filter(pathogen!="SARS-CoV-2 (respiratory panel)") %>%
+    filter(pathogen!="SARS-CoV-2 (respiratory panel)") %>% # Replace "respiratory panel" with "TaqPath" to use respiratory panel results
     group_corona_parainf() %>%
     
     group_by(pathogen) %>%
